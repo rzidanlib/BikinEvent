@@ -1,7 +1,9 @@
 import 'package:bikinevent/pages/checkout_page.dart';
+import 'package:bikinevent/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/event_service.dart';
+import '../services/auth_service.dart';
 import '../models/event_model.dart';
 
 class EventDetailPage extends StatefulWidget {
@@ -18,11 +20,14 @@ class _EventDetailPageState extends State<EventDetailPage> {
   EventModel? _event;
   List<TicketModel> _tickets = [];
   bool _isLoading = true;
+  final _authService = AuthService();
+  String? _userRole;
 
   @override
   void initState() {
     super.initState();
     _loadDetail();
+    _loadUserRole();
   }
 
   Future<void> _loadDetail() async {
@@ -42,6 +47,11 @@ class _EventDetailPageState extends State<EventDetailPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loadUserRole() async {
+    final profile = await _authService.getProfile();
+    if (mounted) setState(() => _userRole = profile?.role);
   }
 
   @override
@@ -114,30 +124,62 @@ class _EventDetailPageState extends State<EventDetailPage> {
           ),
           const SizedBox(height: 8),
 
-          ..._tickets.map(
-            (ticket) => Card(
+          if (_userRole == 'organizer')
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: AppColors.blue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.blue, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Akun Organizer hanya dapat melihat data tiket, tidak dapat melakukan pembelian.',
+                      style: TextStyle(fontSize: 12, color: AppColors.blue),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          ..._tickets.map((ticket) {
+            final isOrganizer = _userRole == 'organizer';
+
+            return Card(
               child: ListTile(
                 title: Text(ticket.name),
                 subtitle: Text(
-                  ticket.isSoldOut ? 'Habis' : 'Sisa ${ticket.remaining} tiket',
+                  isOrganizer
+                      ? 'Terjual ${ticket.sold} / ${ticket.quota}'
+                      : (ticket.isSoldOut
+                            ? 'Habis'
+                            : 'Sisa ${ticket.remaining} tiket'),
                 ),
                 trailing: Text(
                   currencyFormat.format(ticket.price),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                enabled: !ticket.isSoldOut,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          CheckoutPage(ticket: ticket, eventTitle: event.title),
-                    ),
-                  );
-                },
+                enabled: !isOrganizer && !ticket.isSoldOut,
+                onTap: (isOrganizer || ticket.isSoldOut)
+                    ? null
+                    : () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CheckoutPage(
+                              ticket: ticket,
+                              eventTitle: event.title,
+                            ),
+                          ),
+                        );
+                      },
               ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );

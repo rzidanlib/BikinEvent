@@ -1,3 +1,4 @@
+import 'package:bikinevent/services/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/event_model.dart';
@@ -22,6 +23,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
   final _checkoutService = CheckoutService();
   int _quantity = 1;
   bool _isProcessing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAccess();
+  }
+
+  Future<void> _checkAccess() async {
+    final profile = await AuthService().getProfile();
+    if (profile?.role == 'organizer' && mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Akun Organizer tidak dapat membeli tiket'),
+        ),
+      );
+    }
+  }
 
   Future<void> _handleConfirmOrder() async {
     setState(() => _isProcessing = true);
