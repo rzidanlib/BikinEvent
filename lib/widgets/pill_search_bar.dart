@@ -45,6 +45,8 @@ class PillSearchBar extends StatelessWidget {
                       hintText: 'Find amazing events',
                       hintStyle: TextStyle(color: hintColor),
                       border: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),

@@ -1,18 +1,21 @@
-import 'package:bikinevent/services/auth_service.dart';
+import 'package:bikinevent/pages/payment_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/event_model.dart';
-import '../services/checkout_service.dart';
-import 'order_success_page.dart';
+import '../theme/app_colors.dart';
 
 class CheckoutPage extends StatefulWidget {
-  final TicketModel ticket;
+  final List<TicketModel> tickets;
   final String eventTitle;
+  final DateTime eventDate;
+  final String location;
 
   const CheckoutPage({
     super.key,
-    required this.ticket,
+    required this.tickets,
     required this.eventTitle,
+    required this.eventDate,
+    required this.location,
   });
 
   @override
@@ -20,52 +23,27 @@ class CheckoutPage extends StatefulWidget {
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
-  final _checkoutService = CheckoutService();
+  late TicketModel _selectedTicket;
   int _quantity = 1;
-  bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
-    _checkAccess();
+    // Default pilih tiket pertama yang masih tersedia
+    _selectedTicket = widget.tickets.firstWhere(
+      (t) => !t.isSoldOut,
+      orElse: () => widget.tickets.first,
+    );
   }
 
-  Future<void> _checkAccess() async {
-    final profile = await AuthService().getProfile();
-    if (profile?.role == 'organizer' && mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Akun Organizer tidak dapat membeli tiket'),
-        ),
-      );
-    }
+  void _selectTicket(TicketModel ticket) {
+    setState(() {
+      _selectedTicket = ticket;
+      _quantity = 1; // reset jumlah tiap ganti jenis tiket
+    });
   }
 
-  Future<void> _handleConfirmOrder() async {
-    setState(() => _isProcessing = true);
-    try {
-      final orderId = await _checkoutService.createOrder(
-        ticketId: widget.ticket.id,
-        quantity: _quantity,
-      );
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => OrderSuccessPage(orderId: orderId)),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Checkout gagal: ${e.toString()}')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
+  int get _maxQuantity => _selectedTicket.remaining.clamp(0, 5);
 
   @override
   Widget build(BuildContext context) {
@@ -74,66 +52,138 @@ class _CheckoutPageState extends State<CheckoutPage> {
       symbol: 'Rp ',
       decimalDigits: 0,
     );
-    final totalPrice = widget.ticket.price * _quantity;
-    final maxQuantity = widget.ticket.remaining.clamp(
-      0,
-      5,
-    ); // batasi max 5 tiket per transaksi
+    final totalPrice = _selectedTicket.price * _quantity;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Checkout')),
+      appBar: AppBar(title: const Text('Ticket')),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.eventTitle,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+            const Text(
+              'Ticket Type',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: widget.tickets.map((ticket) {
+                final isSelected = ticket.id == _selectedTicket.id;
+                final isDisabled = ticket.isSoldOut;
+
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: GestureDetector(
+                      onTap: isDisabled ? null : () => _selectTicket(ticket),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: isDisabled
+                              ? AppColors.grey2
+                              : (isSelected
+                                    ? AppColors.primary
+                                    : AppColors.primary.withValues(
+                                        alpha: 0.12,
+                                      )),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              ticket.name,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: isDisabled
+                                    ? AppColors.softDarkish
+                                    : (isSelected
+                                          ? Colors.white
+                                          : AppColors.primary),
+                              ),
+                            ),
+                            if (isDisabled)
+                              const Text(
+                                'Habis',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.softDarkish,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text('Jenis tiket: ${widget.ticket.name}'),
-                    Text(
-                      'Harga: ${currencyFormat.format(widget.ticket.price)}',
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 28),
+
+            const Text(
+              'Jumlah Tiket',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: AppColors.grey,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove, color: AppColors.primary),
+                    onPressed: _quantity > 1
+                        ? () => setState(() => _quantity--)
+                        : null,
+                  ),
+                  Text(
+                    '$_quantity',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add, color: AppColors.primary),
+                    onPressed: _quantity < _maxQuantity
+                        ? () => setState(() => _quantity++)
+                        : null,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 28),
 
+            const Text(
+              'Ticket Price',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Jumlah Tiket',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                Text(
+                  '${_selectedTicket.name} Ticket',
+                  style: const TextStyle(color: AppColors.softDarkish),
                 ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline),
-                      onPressed: _quantity > 1
-                          ? () => setState(() => _quantity--)
-                          : null,
-                    ),
-                    Text('$_quantity', style: const TextStyle(fontSize: 18)),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_outline),
-                      onPressed: _quantity < maxQuantity
-                          ? () => setState(() => _quantity++)
-                          : null,
-                    ),
-                  ],
+                Text(currencyFormat.format(_selectedTicket.price)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  '$_quantity x ${currencyFormat.format(_selectedTicket.price)}',
+                  style: const TextStyle(
+                    color: AppColors.softDarkish,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -143,7 +193,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Total Bayar',
+                  'Total Price',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Text(
@@ -151,37 +201,34 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    color: Colors.blue,
+                    color: AppColors.primary,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
 
-            // Note simulasi pembayaran - nanti diganti payment gateway
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Mode simulasi: pesanan langsung dianggap lunas tanpa proses pembayaran nyata.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
-            const SizedBox(height: 16),
+            const Spacer(),
 
             ElevatedButton(
-              onPressed: (_isProcessing || maxQuantity == 0)
+              onPressed: _maxQuantity == 0
                   ? null
-                  : _handleConfirmOrder,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: _isProcessing
-                  ? const CircularProgressIndicator()
-                  : const Text('Konfirmasi & Bayar (Simulasi)'),
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PaymentPage(
+                            ticket: _selectedTicket,
+                            eventTitle: widget.eventTitle,
+                            eventDate:
+                                widget.eventDate, // lihat catatan di bawah
+                            location: widget.location, // lihat catatan di bawah
+                            quantity: _quantity,
+                            totalPrice: totalPrice,
+                          ),
+                        ),
+                      );
+                    },
+              child: const Text('CONTINUE'),
             ),
           ],
         ),

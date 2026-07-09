@@ -1,11 +1,25 @@
+import 'package:bikinevent/widgets/state_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import '../models/order_model.dart';
 import '../services/checkout_service.dart';
+import '../theme/app_colors.dart';
+import '../widgets/ticket_card.dart';
 
 class OrderSuccessPage extends StatefulWidget {
   final String orderId;
-  const OrderSuccessPage({super.key, required this.orderId});
+  final String eventTitle;
+  final String ticketTypeName;
+  final DateTime eventDate;
+  final String location;
+
+  const OrderSuccessPage({
+    super.key,
+    required this.orderId,
+    required this.eventTitle,
+    required this.ticketTypeName,
+    required this.eventDate,
+    required this.location,
+  });
 
   @override
   State<OrderSuccessPage> createState() => _OrderSuccessPageState();
@@ -13,8 +27,12 @@ class OrderSuccessPage extends StatefulWidget {
 
 class _OrderSuccessPageState extends State<OrderSuccessPage> {
   final _checkoutService = CheckoutService();
+  final _pageController = PageController();
+
   List<OrderItemModel> _items = [];
+  int _currentPage = 0;
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -22,64 +40,101 @@ class _OrderSuccessPageState extends State<OrderSuccessPage> {
     _loadItems();
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadItems() async {
-    final items = await _checkoutService.getOrderItems(widget.orderId);
-    if (mounted)
-      setState(() {
-        _items = items;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final items = await _checkoutService.getOrderItems(widget.orderId);
+      setState(() => _items = items);
+    } catch (e) {
+      setState(() => _errorMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showComingSoon() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Fitur download gambar akan segera hadir')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.white,
       appBar: AppBar(
-        title: const Text('Pesanan Berhasil'),
-        automaticallyImplyLeading: false,
+        title: const Text('Tickets'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () {
+            Navigator.popUntil(context, (route) => route.isFirst);
+          },
+        ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
+          ? const LoadingView()
+          : _errorMessage != null
+          ? ErrorView(message: _errorMessage!, onRetry: _loadItems)
+          : Column(
               children: [
-                const Icon(Icons.check_circle, color: Colors.green, size: 64),
-                const SizedBox(height: 12),
-                const Center(
-                  child: Text(
-                    'Tiket kamu sudah siap!',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                ..._items.map(
-                  (item) => Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          QrImageView(data: item.qrCode, size: 180),
-                          const SizedBox(height: 8),
-                          Text(
-                            item.qrCode.substring(0, 8).toUpperCase(),
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: _items.length,
+                    onPageChanged: (index) =>
+                        setState(() => _currentPage = index),
+                    itemBuilder: (context, index) {
+                      final item = _items[index];
+                      return Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: TicketCard(
+                          eventTitle: widget.eventTitle,
+                          ticketTypeName: widget.ticketTypeName,
+                          eventDate: widget.eventDate,
+                          location: widget.location,
+                          qrCode: item.qrCode,
+                        ),
+                      );
+                    },
                   ),
                 ),
 
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () =>
-                      Navigator.popUntil(context, (route) => route.isFirst),
-                  child: const Text('Kembali ke Home'),
+                if (_items.length > 1) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(_items.length, (i) {
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: _currentPage == i ? 20 : 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: _currentPage == i
+                              ? AppColors.primary
+                              : AppColors.grey2,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: ElevatedButton.icon(
+                    onPressed: _showComingSoon,
+                    icon: const Icon(Icons.download),
+                    label: const Text('DOWNLOAD IMAGE'),
+                  ),
                 ),
               ],
             ),
