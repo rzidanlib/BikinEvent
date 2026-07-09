@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:bikinevent/models/dashboard_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/event_model.dart';
 
@@ -140,5 +141,27 @@ class OrganizerService {
       'upcomingCount': upcomingCount,
       'nextEvent': nextEvent,
     };
+  }
+
+  Future<DashboardInsights> getInsights() async {
+    final response = await _client.rpc('get_organizer_insights');
+    return DashboardInsights.fromJson(response as Map<String, dynamic>);
+  }
+
+  Future<List<EventPerformance>> getEventPerformance() async {
+    final response = await _client.rpc('get_organizer_event_performance');
+    return (response as List)
+        .map((json) => EventPerformance.fromJson(json))
+        .toList();
+  }
+
+  Future<List<RecentOrder>> getRecentOrders({int limit = 10}) async {
+    final response = await _client.rpc(
+      'get_organizer_recent_orders',
+      params: {'p_limit': limit},
+    );
+    return (response as List)
+        .map((json) => RecentOrder.fromJson(json))
+        .toList();
   }
 }
