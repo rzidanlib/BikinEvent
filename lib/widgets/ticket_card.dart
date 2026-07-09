@@ -98,6 +98,8 @@ class TicketCard extends StatelessWidget {
                     Expanded(child: _infoField('Ticket', ticketTypeName)),
                   ],
                 ),
+                const SizedBox(height: 16),
+                _infoField('Ticket ID', qrCode.substring(0, 12).toUpperCase()),
                 const SizedBox(height: 20),
               ],
             ),
@@ -149,27 +151,22 @@ class TicketCard extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
             ),
-            padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
-            child: Column(
-              children: [
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: QrImageView(
-                    data: qrCode,
-                    padding: EdgeInsets.zero,
-                    backgroundColor: Colors.white,
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final qrSize = constraints.maxWidth.clamp(0.0, 238.0);
+                return Center(
+                  child: SizedBox(
+                    width: qrSize,
+                    height: qrSize,
+                    child: QrImageView(
+                      data: qrCode,
+                      padding: EdgeInsets.zero,
+                      backgroundColor: Colors.white,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  qrCode.substring(0, 12).toUpperCase(),
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ],

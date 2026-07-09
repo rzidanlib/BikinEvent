@@ -303,19 +303,21 @@ class _ProfilePageState extends State<ProfilePage> {
 
             // Logout diletakkan di bagian paling bawah halaman, terpisah
             // dari konten profile utama, sesuai permintaan
-            OutlinedButton.icon(
-              onPressed: _handleLogout,
-              icon: const Icon(Icons.logout, color: AppColors.error),
-              label: const Text(
-                'Keluar Akun',
-                style: TextStyle(color: AppColors.error),
+            if (!isOrganizer) ...[
+              OutlinedButton.icon(
+                onPressed: _handleLogout,
+                icon: const Icon(Icons.logout, color: AppColors.error),
+                label: const Text(
+                  'Keluar Akun',
+                  style: TextStyle(color: AppColors.error),
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 52),
+                  side: const BorderSide(color: AppColors.error),
+                ),
               ),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 52),
-                side: const BorderSide(color: AppColors.error),
-              ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ],
           ],
         ),
       ),

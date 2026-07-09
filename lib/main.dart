@@ -1,5 +1,6 @@
 import 'package:bikinevent/pages/organizer/organizer_dashboard_page.dart';
 import 'package:bikinevent/pages/organizer/organizer_shell.dart';
+import 'package:bikinevent/pages/splash_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -29,7 +30,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Ticketing Event App',
       theme: AppTheme.lightTheme,
-      home: const AuthGate(),
+      home: const SplashPage(),
     );
   }
 }

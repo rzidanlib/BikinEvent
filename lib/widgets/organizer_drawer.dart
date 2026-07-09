@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
-enum OrganizerPage { dashboard, events, tickets, category, scan, settings }
+enum OrganizerPage { dashboard, events, tickets, category }
 
 class OrganizerDrawer extends StatelessWidget {
   final OrganizerPage currentPage;
   final ValueChanged<OrganizerPage> onSelect;
+  final VoidCallback onLogout;
 
   const OrganizerDrawer({
     super.key,
     required this.currentPage,
     required this.onSelect,
+    required this.onLogout,
   });
 
   @override
@@ -73,20 +75,39 @@ class OrganizerDrawer extends StatelessWidget {
               Icons.category_outlined,
               'Category',
             ),
-            _menuItem(
-              context,
-              OrganizerPage.scan,
-              Icons.qr_code_scanner,
-              'Scan Tiket',
-            ),
 
             const Spacer(),
             const Divider(height: 1),
-            _menuItem(
-              context,
-              OrganizerPage.settings,
-              Icons.settings_outlined,
-              'Settings',
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    Navigator.pop(context);
+                    onLogout();
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout, size: 20, color: AppColors.error),
+                        SizedBox(width: 14),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
           ],
@@ -102,7 +123,6 @@ class OrganizerDrawer extends StatelessWidget {
     String label,
   ) {
     final isSelected = currentPage == page;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Material(
@@ -113,7 +133,7 @@ class OrganizerDrawer extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            Navigator.pop(context); // tutup drawer dulu
+            Navigator.pop(context);
             onSelect(page);
           },
           child: Padding(

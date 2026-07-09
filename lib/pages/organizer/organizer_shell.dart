@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/organizer_drawer.dart';
+import '../auth/login_page.dart';
 import '../profile_page.dart';
-import '../scan_ticket_page.dart';
 import 'organizer_dashboard_page.dart';
 import 'organizer_tickets_page.dart';
-import 'organizer_settings_page.dart';
 
 class OrganizerShell extends StatefulWidget {
   const OrganizerShell({super.key});
@@ -31,11 +30,46 @@ class _OrganizerShellState extends State<OrganizerShell> {
   Future<void> _loadAvatar() async {
     final profile = await _authService.getProfile();
     if (mounted) {
-      setState(() {
-        _avatarInitial = (profile?.fullName.isNotEmpty ?? false)
+      setState(
+        () => _avatarInitial = (profile?.fullName.isNotEmpty ?? false)
             ? profile!.fullName[0].toUpperCase()
-            : '?';
-      });
+            : '?',
+      );
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Keluar Akun?'),
+        content: const Text(
+          'Kamu perlu login kembali untuk mengakses akun ini.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Keluar',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await _authService.signOut();
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
     }
   }
 
@@ -49,10 +83,6 @@ class _OrganizerShellState extends State<OrganizerShell> {
         return 'Tickets';
       case OrganizerPage.category:
         return 'Category';
-      case OrganizerPage.scan:
-        return 'Scan Tiket';
-      case OrganizerPage.settings:
-        return 'Settings';
     }
   }
 
@@ -66,10 +96,6 @@ class _OrganizerShellState extends State<OrganizerShell> {
         return const OrganizerTicketsPage();
       case OrganizerPage.category:
         return const OrganizerCategoryPage();
-      case OrganizerPage.scan:
-        return const ScanTicketPage();
-      case OrganizerPage.settings:
-        return const OrganizerSettingsPage();
     }
   }
 
@@ -110,6 +136,7 @@ class _OrganizerShellState extends State<OrganizerShell> {
       drawer: OrganizerDrawer(
         currentPage: _currentPage,
         onSelect: (page) => setState(() => _currentPage = page),
+        onLogout: _handleLogout,
       ),
       body: _pageBody,
     );

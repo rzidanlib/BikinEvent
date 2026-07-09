@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:bikinevent/models/dashboard_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/event_model.dart';
+import '../models/organizer_ticket_model.dart';
 
 class OrganizerService {
   final SupabaseClient _client = Supabase.instance.client;
@@ -55,7 +56,7 @@ class OrganizerService {
 
     final response = await _client
         .from('events')
-        .select('*, categories(name)')
+        .select('*, categories(name), tickets(price, sold, quota)')
         .eq('organizer_id', userId)
         .order('event_date', ascending: false);
 
@@ -163,5 +164,92 @@ class OrganizerService {
     return (response as List)
         .map((json) => RecentOrder.fromJson(json))
         .toList();
+  }
+
+  Future<void> updateEvent({
+    required String eventId,
+    required String title,
+    required String description,
+    required String location,
+    required DateTime eventDate,
+    required String categoryId,
+    required bool isPublic,
+    String? posterUrl,
+  }) async {
+    await _client
+        .from('events')
+        .update({
+          'category_id': categoryId,
+          'title': title,
+          'description': description,
+          'location': location,
+          'event_date': eventDate.toIso8601String(),
+          'is_public': isPublic,
+          if (posterUrl != null) 'poster_url': posterUrl,
+        })
+        .eq('id', eventId);
+  }
+
+  // Ambil semua tiket dari semua event milik organizer, sekaligus nama event-nya
+  Future<List<Map<String, dynamic>>> getAllTicketsRaw() async {
+    final userId = _client.auth.currentUser!.id;
+    final response = await _client
+        .from('tickets')
+        .select('*, events!inner(title, organizer_id)')
+        .eq('events.organizer_id', userId)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  Future<void> createTicket({
+    required String eventId,
+    required String name,
+    required String category,
+    required double price,
+    required int quota,
+  }) async {
+    await _client.from('tickets').insert({
+      'event_id': eventId,
+      'name': name,
+      'category': category,
+      'price': price,
+      'quota': quota,
+    });
+  }
+
+  Future<void> updateTicket({
+    required String ticketId,
+    required String name,
+    required String category,
+    required double price,
+    required int quota,
+  }) async {
+    await _client
+        .from('tickets')
+        .update({
+          'name': name,
+          'category': category,
+          'price': price,
+          'quota': quota,
+        })
+        .eq('id', ticketId);
+  }
+
+  Future<void> createCategory({
+    required String name,
+    required String icon,
+  }) async {
+    await _client.from('categories').insert({'name': name, 'icon': icon});
+  }
+
+  Future<void> updateCategory({
+    required String id,
+    required String name,
+    required String icon,
+  }) async {
+    await _client
+        .from('categories')
+        .update({'name': name, 'icon': icon})
+        .eq('id', id);
   }
 }

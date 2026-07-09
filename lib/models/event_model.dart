@@ -60,6 +60,7 @@ class EventModel {
   final bool isPublic;
   final double lowestPrice;
   final int totalSold;
+  final int totalQuota;
 
   // Data relasi (opsional, diisi kalau di-join saat query)
   final String? organizerName;
@@ -79,20 +80,24 @@ class EventModel {
     this.categoryName,
     this.lowestPrice = 0,
     this.totalSold = 0,
+    this.totalQuota = 0,
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
     double lowest = 0;
     int sold = 0;
+    int quota = 0;
 
     if (json['tickets'] != null) {
       final tickets = json['tickets'] as List;
       if (tickets.isNotEmpty) {
         final prices = tickets
-            .map((t) => (t['price'] as num).toDouble())
+            .map((t) => (t['price'] as num?)?.toDouble() ?? 0.0)
             .toList();
-        lowest = prices.reduce((a, b) => a < b ? a : b);
-        sold = tickets.fold(0, (sum, t) => sum + (t['sold'] as int));
+        lowest = prices.isNotEmpty ? prices.reduce((a, b) => a < b ? a : b) : 0;
+
+        sold = tickets.fold(0, (sum, t) => sum + ((t['sold'] as int?) ?? 0));
+        quota = tickets.fold(0, (sum, t) => sum + ((t['quota'] as int?) ?? 0));
       }
     }
 
@@ -106,7 +111,6 @@ class EventModel {
       posterUrl: json['poster_url'],
       eventDate: DateTime.parse(json['event_date']),
       isPublic: json['is_public'],
-      // Kalau query pakai join, Supabase mengembalikan nested object
       organizerName: json['profiles'] != null
           ? json['profiles']['full_name']
           : null,
@@ -115,6 +119,7 @@ class EventModel {
           : null,
       lowestPrice: lowest,
       totalSold: sold,
+      totalQuota: quota,
     );
   }
 }

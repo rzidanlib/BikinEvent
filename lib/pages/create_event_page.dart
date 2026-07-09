@@ -5,9 +5,12 @@ import 'package:image_picker/image_picker.dart';
 import '../../services/organizer_service.dart';
 import '../../services/event_service.dart';
 import '../../models/event_model.dart';
+import '../../theme/app_colors.dart';
 
 class CreateEventPage extends StatefulWidget {
-  const CreateEventPage({super.key});
+  final String? eventId; // null = mode create, terisi = mode edit
+
+  const CreateEventPage({super.key, this.eventId});
 
   @override
   State<CreateEventPage> createState() => _CreateEventPageState();
@@ -19,51 +22,68 @@ class _CreateEventPageState extends State<CreateEventPage> {
   final _eventService = EventService();
 
   final _titleController = TextEditingController();
-  final _descController = TextEditingController();
   final _locationController = TextEditingController();
+  final _descController = TextEditingController();
 
   List<CategoryModel> _categories = [];
   String? _selectedCategoryId;
   DateTime? _selectedDate;
   bool _isPublic = true;
   File? _posterFile;
+  String? _existingPosterUrl; // untuk mode edit, sebelum ada file baru dipilih
   bool _isLoading = false;
+  bool _isLoadingInitial = true;
+
+  bool get _isEditMode => widget.eventId != null;
 
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    _init();
   }
 
-  Future<void> _loadCategories() async {
+  Future<void> _init() async {
     final categories = await _eventService.getCategories();
     setState(() => _categories = categories);
+
+    if (_isEditMode) {
+      final event = await _eventService.getEventDetail(widget.eventId!);
+      setState(() {
+        _titleController.text = event.title;
+        _locationController.text = event.location;
+        _descController.text = event.description ?? '';
+        _selectedCategoryId = event.categoryId;
+        _selectedDate = event.eventDate;
+        _isPublic = event.isPublic;
+        _existingPosterUrl = event.posterUrl;
+      });
+    }
+    setState(() => _isLoadingInitial = false);
   }
 
   Future<void> _pickPoster() async {
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
       maxWidth: 1200,
-      imageQuality:
-          80, // kompres otomatis biar upload lebih cepat & hemat storage
+      imageQuality: 80,
     );
-    if (picked != null) {
-      setState(() => _posterFile = File(picked.path));
-    }
+    if (picked != null) setState(() => _posterFile = File(picked.path));
   }
 
   Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
+      initialDate: _selectedDate ?? DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (date == null || !mounted) return;
 
     final time = await showTimePicker(
       context: context,
-      initialTime: const TimeOfDay(hour: 9, minute: 0),
+      initialTime: _selectedDate != null
+          ? TimeOfDay.fromDateTime(_selectedDate!)
+          : const TimeOfDay(hour: 9, minute: 0),
     );
     if (time == null) return;
 
@@ -89,7 +109,7 @@ class _CreateEventPageState extends State<CreateEventPage> {
     if (_selectedCategoryId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Pilih kategori event')));
+      ).showSnackBar(const SnackBar(content: Text('Pilih tipe event')));
       return;
     }
 
@@ -100,36 +120,54 @@ class _CreateEventPageState extends State<CreateEventPage> {
         posterUrl = await _organizerService.uploadPoster(_posterFile!);
       }
 
-      final eventId = await _organizerService.createEvent(
-        title: _titleController.text.trim(),
-        description: _descController.text.trim(),
-        location: _locationController.text.trim(),
-        eventDate: _selectedDate!,
-        categoryId: _selectedCategoryId!,
-        isPublic: _isPublic,
-        posterUrl: posterUrl,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Event berhasil dibuat! Sekarang tambahkan jenis tiket.',
+      if (_isEditMode) {
+        await _organizerService.updateEvent(
+          eventId: widget.eventId!,
+          title: _titleController.text.trim(),
+          description: _descController.text.trim(),
+          location: _locationController.text.trim(),
+          eventDate: _selectedDate!,
+          categoryId: _selectedCategoryId!,
+          isPublic: _isPublic,
+          posterUrl: posterUrl, // null berarti poster lama dipertahankan
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Perubahan berhasil disimpan')),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        final eventId = await _organizerService.createEvent(
+          title: _titleController.text.trim(),
+          description: _descController.text.trim(),
+          location: _locationController.text.trim(),
+          eventDate: _selectedDate!,
+          categoryId: _selectedCategoryId!,
+          isPublic: _isPublic,
+          posterUrl: posterUrl,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Event berhasil dibuat! Sekarang tambahkan jenis tiket.',
+              ),
             ),
-          ),
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ManageTicketsPage(eventId: eventId),
-          ),
-        );
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ManageTicketsPage(eventId: eventId),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Gagal membuat event: $e')));
+        ).showSnackBar(SnackBar(content: Text('Gagal menyimpan: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -138,121 +176,262 @@ class _CreateEventPageState extends State<CreateEventPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingInitial) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Buat Event Baru')),
+      backgroundColor: AppColors.white,
+      appBar: AppBar(
+        title: Text(_isEditMode ? 'Edit Event' : 'Create New Event'),
+        centerTitle: true,
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           children: [
-            GestureDetector(
-              onTap: _pickPoster,
-              child: Container(
-                height: 160,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(12),
-                  image: _posterFile != null
-                      ? DecorationImage(
-                          image: FileImage(_posterFile!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: _posterFile == null
-                    ? const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.add_photo_alternate_outlined,
-                              size: 40,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Tambah Poster Event',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      )
-                    : null,
-              ),
+            _buildCoverPhotoBox(),
+            const SizedBox(height: 28),
+
+            const Text(
+              'Event Details',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
             ),
             const SizedBox(height: 16),
 
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Judul Event'),
-              validator: (v) => (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-            ),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _descController,
-              decoration: const InputDecoration(labelText: 'Deskripsi'),
-              maxLines: 4,
-              validator: (v) => (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-            ),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _locationController,
-              decoration: const InputDecoration(labelText: 'Lokasi'),
-              validator: (v) => (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-            ),
-            const SizedBox(height: 12),
-
-            DropdownButtonFormField<String>(
-              initialValue: _selectedCategoryId,
-              decoration: const InputDecoration(labelText: 'Kategori'),
-              items: _categories
-                  .map(
-                    (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _selectedCategoryId = value),
-            ),
-            const SizedBox(height: 12),
-
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                _selectedDate == null
-                    ? 'Pilih Tanggal & Waktu'
-                    : _selectedDate.toString(),
+            _labeledField(
+              label: 'Event Name',
+              required: true,
+              child: TextFormField(
+                controller: _titleController,
+                decoration: _fieldDecoration('Type your event name'),
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? 'Wajib diisi' : null,
               ),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: _pickDate,
             ),
-            const Divider(),
+            const SizedBox(height: 18),
 
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Event Publik'),
-              subtitle: Text(
-                _isPublic
-                    ? 'Terbuka untuk umum'
-                    : 'Khusus (misal hanya mahasiswa kampus tertentu)',
+            _labeledField(
+              label: 'Location',
+              required: true,
+              child: TextFormField(
+                controller: _locationController,
+                decoration: _fieldDecoration('Type event location'),
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? 'Wajib diisi' : null,
               ),
-              value: _isPublic,
-              onChanged: (value) => setState(() => _isPublic = value),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
+
+            _labeledField(
+              label: 'Event Type',
+              required: true,
+              child: DropdownButtonFormField<String>(
+                initialValue: _selectedCategoryId,
+                decoration: _fieldDecoration('Choose event type'),
+                items: _categories
+                    .map(
+                      (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _selectedCategoryId = value),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            _labeledField(
+              label: 'Select Date and Time',
+              required: true,
+              child: InkWell(
+                onTap: _pickDate,
+                borderRadius: BorderRadius.circular(16),
+                child: InputDecorator(
+                  decoration: _fieldDecoration('Choose event Date').copyWith(
+                    suffixIcon: const Icon(
+                      Icons.calendar_today_outlined,
+                      size: 20,
+                      color: AppColors.softDarkish,
+                    ),
+                  ),
+                  child: Text(
+                    _selectedDate == null
+                        ? ''
+                        : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year} • ${TimeOfDay.fromDateTime(_selectedDate!).format(context)}',
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            _labeledField(
+              label: 'Event Visibility',
+              required: false,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.grey2),
+                ),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    _isPublic ? 'Publik (terbuka untuk umum)' : 'Khusus',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  value: _isPublic,
+                  onChanged: (v) => setState(() => _isPublic = v),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            _labeledField(
+              label: 'Event Description',
+              required: true,
+              child: TextFormField(
+                controller: _descController,
+                maxLines: 5,
+                decoration: _fieldDecoration('Type your event description...'),
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+              ),
+            ),
+            const SizedBox(height: 32),
 
             ElevatedButton(
               onPressed: _isLoading ? null : _handleSubmit,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
               child: _isLoading
-                  ? const CircularProgressIndicator()
-                  : const Text('Simpan & Lanjut Tambah Tiket'),
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text(_isEditMode ? 'SAVE CHANGES' : 'PUBLISH NOW'),
             ),
+            const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCoverPhotoBox() {
+    final hasImage = _posterFile != null || _existingPosterUrl != null;
+
+    return GestureDetector(
+      onTap: _pickPoster,
+      child: Container(
+        height: 180,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.4),
+            width: 1.4,
+          ),
+          image: _posterFile != null
+              ? DecorationImage(
+                  image: FileImage(_posterFile!),
+                  fit: BoxFit.cover,
+                )
+              : (_existingPosterUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(_existingPosterUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null),
+        ),
+        child: hasImage
+            ? Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: CircleAvatar(
+                    radius: 14,
+                    backgroundColor: Colors.black.withValues(alpha: 0.5),
+                    child: const Icon(
+                      Icons.edit,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ),
+                ),
+              )
+            : const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add, size: 32, color: AppColors.primary),
+                    SizedBox(height: 6),
+                    Text(
+                      'Add Cover Photos',
+                      style: TextStyle(color: AppColors.softDarkish),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _labeledField({
+    required String label,
+    required bool required,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RichText(
+          text: TextSpan(
+            text: label,
+            style: const TextStyle(
+              color: AppColors.textBlack,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+            children: required
+                ? const [
+                    TextSpan(
+                      text: ' *',
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                  ]
+                : [],
+          ),
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
+    );
+  }
+
+  InputDecoration _fieldDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.grey2),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.grey2),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
     );
   }
