@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class CategoryModel {
   final String id;
   final String name;
@@ -114,5 +116,23 @@ class EventModel {
       lowestPrice: lowest,
       totalSold: sold,
     );
+  }
+}
+
+// Tambahkan di bagian bawah file event_model.dart
+IconData categoryIconFromString(String? iconName) {
+  switch (iconName) {
+    case 'mic':
+      return Icons.mic;
+    case 'music_note':
+      return Icons.music_note;
+    case 'sports_soccer':
+      return Icons.sports_soccer;
+    case 'storefront':
+      return Icons.storefront;
+    case 'build':
+      return Icons.build;
+    default:
+      return Icons.category;
   }
 }

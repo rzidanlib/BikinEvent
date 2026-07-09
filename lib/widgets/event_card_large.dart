@@ -130,7 +130,7 @@ class EventCardLarge extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      AvatarStack(count: soldCount),
+                      Expanded(child: AvatarStack(count: soldCount)),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
