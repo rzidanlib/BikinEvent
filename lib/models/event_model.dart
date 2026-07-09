@@ -56,6 +56,8 @@ class EventModel {
   final String? posterUrl;
   final DateTime eventDate;
   final bool isPublic;
+  final double lowestPrice;
+  final int totalSold;
 
   // Data relasi (opsional, diisi kalau di-join saat query)
   final String? organizerName;
@@ -73,9 +75,25 @@ class EventModel {
     required this.isPublic,
     this.organizerName,
     this.categoryName,
+    this.lowestPrice = 0,
+    this.totalSold = 0,
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
+    double lowest = 0;
+    int sold = 0;
+
+    if (json['tickets'] != null) {
+      final tickets = json['tickets'] as List;
+      if (tickets.isNotEmpty) {
+        final prices = tickets
+            .map((t) => (t['price'] as num).toDouble())
+            .toList();
+        lowest = prices.reduce((a, b) => a < b ? a : b);
+        sold = tickets.fold(0, (sum, t) => sum + (t['sold'] as int));
+      }
+    }
+
     return EventModel(
       id: json['id'],
       organizerId: json['organizer_id'],
@@ -93,6 +111,8 @@ class EventModel {
       categoryName: json['categories'] != null
           ? json['categories']['name']
           : null,
+      lowestPrice: lowest,
+      totalSold: sold,
     );
   }
 }

@@ -45,4 +45,20 @@ class AppColors {
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
+
+  static const Color heroDarkStart = Color(0xFF20222C);
+  static const Color heroDarkEnd = Color(0xFF171924);
+
+  static const LinearGradient heroGradient = LinearGradient(
+    colors: [heroDarkStart, heroDarkEnd],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  // Overlay gelap tipis di atas gambar poster, supaya teks/icon tetap terbaca
+  static LinearGradient imageOverlayGradient = LinearGradient(
+    colors: [Colors.black.withValues(alpha: 0.55), Colors.transparent],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
 }

@@ -17,7 +17,9 @@ class EventService {
   Future<List<EventModel>> getEvents({String? categoryId}) async {
     var query = _client
         .from('events')
-        .select('*, profiles(full_name), categories(name)');
+        .select(
+          '*, profiles(full_name), categories(name), tickets(price, sold)',
+        );
 
     if (categoryId != null) {
       query = query.eq('category_id', categoryId);
