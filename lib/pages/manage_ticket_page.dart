@@ -14,12 +14,14 @@ class ManageTicketsPage extends StatefulWidget {
 class _ManageTicketsPageState extends State<ManageTicketsPage> {
   final _organizerService = OrganizerService();
   List<TicketModel> _tickets = [];
+  List<TicketTypeModel> _ticketTypes = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadTickets();
+    _loadTicketTypes();
   }
 
   Future<void> _loadTickets() async {
@@ -31,12 +33,30 @@ class _ManageTicketsPageState extends State<ManageTicketsPage> {
     });
   }
 
+  Future<void> _loadTicketTypes() async {
+    final types = await _organizerService.getTicketTypes();
+    setState(() => _ticketTypes = types);
+  }
+
   void _showAddTicketSheet() {
-    final nameController = TextEditingController();
+    TicketTypeModel? selectedType = _ticketTypes.isNotEmpty
+        ? _ticketTypes.first
+        : null;
     final priceController = TextEditingController();
     final quotaController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool isSaving = false;
+
+    if (_ticketTypes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Belum ada jenis tiket. Buat dulu lewat menu Tickets di sidebar.',
+          ),
+        ),
+      );
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -56,17 +76,19 @@ class _ManageTicketsPageState extends State<ManageTicketsPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Tambah Jenis Tiket',
+                  'Tambah Tiket ke Event',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nama Tiket (misal: Reguler, VIP)',
-                  ),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                DropdownButtonFormField<TicketTypeModel>(
+                  initialValue: selectedType,
+                  decoration: const InputDecoration(labelText: 'Jenis Tiket'),
+                  items: _ticketTypes
+                      .map(
+                        (t) => DropdownMenuItem(value: t, child: Text(t.name)),
+                      )
+                      .toList(),
+                  onChanged: (v) => setSheetState(() => selectedType = v),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -91,12 +113,15 @@ class _ManageTicketsPageState extends State<ManageTicketsPage> {
                   onPressed: isSaving
                       ? null
                       : () async {
-                          if (!formKey.currentState!.validate()) return;
+                          if (!formKey.currentState!.validate() ||
+                              selectedType == null)
+                            return;
                           setSheetState(() => isSaving = true);
                           try {
                             await _organizerService.addTicket(
                               eventId: widget.eventId,
-                              name: nameController.text.trim(),
+                              ticketTypeId: selectedType!.id,
+                              ticketTypeName: selectedType!.name,
                               price: double.parse(priceController.text),
                               quota: int.parse(quotaController.text),
                             );

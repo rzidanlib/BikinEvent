@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:bikinevent/models/dashboard_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/event_model.dart';
-import '../models/organizer_ticket_model.dart';
 
 class OrganizerService {
   final SupabaseClient _client = Supabase.instance.client;
@@ -29,6 +28,9 @@ class OrganizerService {
     required String categoryId,
     required bool isPublic,
     String? posterUrl,
+    double? latitude,
+    double? longitude,
+    String? mapsUrl,
   }) async {
     final userId = _client.auth.currentUser!.id;
 
@@ -43,6 +45,9 @@ class OrganizerService {
           'event_date': eventDate.toIso8601String(),
           'is_public': isPublic,
           'poster_url': posterUrl,
+          'latitude': latitude,
+          'longitude': longitude,
+          'maps_url': mapsUrl,
         })
         .select()
         .single();
@@ -66,13 +71,15 @@ class OrganizerService {
   // Tambah jenis tiket ke event
   Future<void> addTicket({
     required String eventId,
-    required String name,
+    required String ticketTypeId,
+    required String ticketTypeName,
     required double price,
     required int quota,
   }) async {
     await _client.from('tickets').insert({
       'event_id': eventId,
-      'name': name,
+      'ticket_type_id': ticketTypeId,
+      'name': ticketTypeName,
       'price': price,
       'quota': quota,
     });
@@ -175,6 +182,9 @@ class OrganizerService {
     required String categoryId,
     required bool isPublic,
     String? posterUrl,
+    double? latitude,
+    double? longitude,
+    String? mapsUrl,
   }) async {
     await _client
         .from('events')
@@ -186,53 +196,27 @@ class OrganizerService {
           'event_date': eventDate.toIso8601String(),
           'is_public': isPublic,
           if (posterUrl != null) 'poster_url': posterUrl,
+          'latitude': latitude,
+          'longitude': longitude,
+          'maps_url': mapsUrl,
         })
         .eq('id', eventId);
   }
 
   // Ambil semua tiket dari semua event milik organizer, sekaligus nama event-nya
-  Future<List<Map<String, dynamic>>> getAllTicketsRaw() async {
-    final userId = _client.auth.currentUser!.id;
-    final response = await _client
-        .from('tickets')
-        .select('*, events!inner(title, organizer_id)')
-        .eq('events.organizer_id', userId)
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(response);
+  Future<List<TicketTypeModel>> getTicketTypes() async {
+    final response = await _client.from('ticket_types').select().order('name');
+    return (response as List)
+        .map((json) => TicketTypeModel.fromJson(json))
+        .toList();
   }
 
-  Future<void> createTicket({
-    required String eventId,
-    required String name,
-    required String category,
-    required double price,
-    required int quota,
-  }) async {
-    await _client.from('tickets').insert({
-      'event_id': eventId,
-      'name': name,
-      'category': category,
-      'price': price,
-      'quota': quota,
-    });
+  Future<void> createTicketType(String name) async {
+    await _client.from('ticket_types').insert({'name': name});
   }
 
-  Future<void> updateTicket({
-    required String ticketId,
-    required String name,
-    required String category,
-    required double price,
-    required int quota,
-  }) async {
-    await _client
-        .from('tickets')
-        .update({
-          'name': name,
-          'category': category,
-          'price': price,
-          'quota': quota,
-        })
-        .eq('id', ticketId);
+  Future<void> updateTicketType(String id, String name) async {
+    await _client.from('ticket_types').update({'name': name}).eq('id', id);
   }
 
   Future<void> createCategory({

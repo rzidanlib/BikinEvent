@@ -22,7 +22,7 @@ class _SplashPageState extends State<SplashPage>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     )..repeat();
-    Timer(const Duration(seconds: 2), () {
+    Timer(const Duration(seconds: 4), () {
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -30,6 +30,7 @@ class _SplashPageState extends State<SplashPage>
         );
       }
     });
+    ;
   }
 
   @override

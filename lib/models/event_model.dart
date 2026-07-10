@@ -61,6 +61,9 @@ class EventModel {
   final double lowestPrice;
   final int totalSold;
   final int totalQuota;
+  final double? latitude;
+  final double? longitude;
+  final String? mapsUrl;
 
   // Data relasi (opsional, diisi kalau di-join saat query)
   final String? organizerName;
@@ -81,6 +84,9 @@ class EventModel {
     this.lowestPrice = 0,
     this.totalSold = 0,
     this.totalQuota = 0,
+    this.latitude,
+    this.longitude,
+    this.mapsUrl,
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
@@ -120,6 +126,9 @@ class EventModel {
       lowestPrice: lowest,
       totalSold: sold,
       totalQuota: quota,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      mapsUrl: json['maps_url'],
     );
   }
 }
@@ -139,5 +148,16 @@ IconData categoryIconFromString(String? iconName) {
       return Icons.build;
     default:
       return Icons.category;
+  }
+}
+
+class TicketTypeModel {
+  final String id;
+  final String name;
+
+  TicketTypeModel({required this.id, required this.name});
+
+  factory TicketTypeModel.fromJson(Map<String, dynamic> json) {
+    return TicketTypeModel(id: json['id'], name: json['name']);
   }
 }

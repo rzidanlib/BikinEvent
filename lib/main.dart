@@ -1,7 +1,7 @@
-import 'package:bikinevent/pages/organizer/organizer_dashboard_page.dart';
 import 'package:bikinevent/pages/organizer/organizer_shell.dart';
 import 'package:bikinevent/pages/splash_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'pages/auth/login_page.dart';
@@ -27,6 +27,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Native splash dilepas setelah frame pertama selesai digambar,
+    // langsung disambung SplashPage (Dart) yang identik tampilannya --
+    // jadi user tidak melihat "kedipan" transisi antar splash.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FlutterNativeSplash.remove();
+    });
+
     return MaterialApp(
       title: 'Ticketing Event App',
       theme: AppTheme.lightTheme,

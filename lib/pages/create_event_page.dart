@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:bikinevent/pages/manage_ticket_page.dart';
+import 'package:bikinevent/utiils/maps_url_parser.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/organizer_service.dart';
@@ -24,6 +25,9 @@ class _CreateEventPageState extends State<CreateEventPage> {
   final _titleController = TextEditingController();
   final _locationController = TextEditingController();
   final _descController = TextEditingController();
+  final _mapsUrlController = TextEditingController();
+  LatLng? _parsedLatLng;
+  bool _isResolvingMapsUrl = false;
 
   List<CategoryModel> _categories = [];
   String? _selectedCategoryId;
@@ -42,6 +46,11 @@ class _CreateEventPageState extends State<CreateEventPage> {
     _init();
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   Future<void> _init() async {
     final categories = await _eventService.getCategories();
     setState(() => _categories = categories);
@@ -56,6 +65,10 @@ class _CreateEventPageState extends State<CreateEventPage> {
         _selectedDate = event.eventDate;
         _isPublic = event.isPublic;
         _existingPosterUrl = event.posterUrl;
+        _mapsUrlController.text = event.mapsUrl ?? '';
+        if (event.latitude != null && event.longitude != null) {
+          _parsedLatLng = LatLng(event.latitude!, event.longitude!);
+        }
       });
     }
     setState(() => _isLoadingInitial = false);
@@ -101,20 +114,21 @@ class _CreateEventPageState extends State<CreateEventPage> {
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pilih tanggal & waktu event')),
-      );
-      return;
+      /* ...tetap sama... */
     }
     if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Pilih tipe event')));
-      return;
+      /* ...tetap sama... */
     }
 
     setState(() => _isLoading = true);
     try {
+      // Resolve koordinat dari link maps SEBELUM createEvent/updateEvent dipanggil
+      LatLng? resolvedLatLng;
+      final mapsUrlText = _mapsUrlController.text.trim();
+      if (mapsUrlText.isNotEmpty) {
+        resolvedLatLng = await resolveLatLngFromMapsUrl(mapsUrlText);
+      }
+
       String? posterUrl;
       if (_posterFile != null) {
         posterUrl = await _organizerService.uploadPoster(_posterFile!);
@@ -129,7 +143,10 @@ class _CreateEventPageState extends State<CreateEventPage> {
           eventDate: _selectedDate!,
           categoryId: _selectedCategoryId!,
           isPublic: _isPublic,
-          posterUrl: posterUrl, // null berarti poster lama dipertahankan
+          posterUrl: posterUrl,
+          latitude: resolvedLatLng?.lat,
+          longitude: resolvedLatLng?.lng,
+          mapsUrl: mapsUrlText.isEmpty ? null : mapsUrlText,
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -146,6 +163,9 @@ class _CreateEventPageState extends State<CreateEventPage> {
           categoryId: _selectedCategoryId!,
           isPublic: _isPublic,
           posterUrl: posterUrl,
+          latitude: resolvedLatLng?.lat,
+          longitude: resolvedLatLng?.lng,
+          mapsUrl: mapsUrlText.isEmpty ? null : mapsUrlText,
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -164,11 +184,10 @@ class _CreateEventPageState extends State<CreateEventPage> {
         }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Gagal menyimpan: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -223,6 +242,40 @@ class _CreateEventPageState extends State<CreateEventPage> {
               ),
             ),
             const SizedBox(height: 18),
+
+            _labeledField(
+              label: 'Link Google Maps',
+              required: false,
+              child: TextFormField(
+                controller: _mapsUrlController,
+                decoration: _fieldDecoration('Tempel link Google Maps di sini')
+                    .copyWith(
+                      suffixIcon: const Icon(
+                        Icons.map_outlined,
+                        size: 20,
+                        color: AppColors.softDarkish,
+                      ),
+                    ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Koordinat akan otomatis dideteksi saat menyimpan',
+                style: TextStyle(fontSize: 11, color: AppColors.softDarkish),
+              ),
+            ),
+            if (_parsedLatLng != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Koordinat terdeteksi: ${_parsedLatLng!.lat.toStringAsFixed(6)}, ${_parsedLatLng!.lng.toStringAsFixed(6)}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.success,
+                  ),
+                ),
+              ),
 
             _labeledField(
               label: 'Event Type',

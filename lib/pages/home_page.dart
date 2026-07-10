@@ -1,5 +1,6 @@
 import 'package:bikinevent/pages/calendar_page.dart';
 import 'package:bikinevent/pages/my_tickets.dart';
+import 'package:bikinevent/services/location_service.dart';
 import 'package:bikinevent/widgets/state_widget.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
@@ -93,7 +94,9 @@ class _EventListViewState extends State<_EventListView> {
   final _eventService = EventService();
   final _authService = AuthService();
   final _searchController = TextEditingController();
+  final _locationService = LocationService();
 
+  String? _locationLabel;
   List<CategoryModel> _categories = [];
   List<EventModel> _events = [];
   Profile? _profile;
@@ -105,12 +108,23 @@ class _EventListViewState extends State<_EventListView> {
   void initState() {
     super.initState();
     _loadData();
+    _loadLocation();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadLocation() async {
+    final position = await _locationService.getCurrentPosition();
+    if (position == null || !mounted) return;
+
+    final city = await _locationService.getCityName(position);
+    if (mounted && city != null) {
+      setState(() => _locationLabel = city);
+    }
   }
 
   Future<void> _loadData() async {
@@ -191,6 +205,7 @@ class _EventListViewState extends State<_EventListView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
                   radius: 22,
@@ -227,6 +242,34 @@ class _EventListViewState extends State<_EventListView> {
                     ],
                   ),
                 ),
+                if (_locationLabel != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'Current location',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            _locationLabel!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(
+                            Icons.location_on,
+                            color: AppColors.primary,
+                            size: 14,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
               ],
             ),
             const SizedBox(height: 20),
