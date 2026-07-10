@@ -26,9 +26,9 @@ class _CreateEventPageState extends State<CreateEventPage> {
   final _locationController = TextEditingController();
   final _descController = TextEditingController();
   final _mapsUrlController = TextEditingController();
+
   LatLng? _parsedLatLng;
   bool _isResolvingMapsUrl = false;
-
   List<CategoryModel> _categories = [];
   String? _selectedCategoryId;
   DateTime? _selectedDate;

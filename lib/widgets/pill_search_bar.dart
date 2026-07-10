@@ -4,13 +4,15 @@ import '../theme/app_colors.dart';
 class PillSearchBar extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted; // baru
   final VoidCallback? onFilterTap;
-  final bool dark; // true = versi di atas background gelap (Home header)
+  final bool dark;
 
   const PillSearchBar({
     super.key,
     required this.controller,
     this.onChanged,
+    this.onSubmitted,
     this.onFilterTap,
     this.dark = true,
   });

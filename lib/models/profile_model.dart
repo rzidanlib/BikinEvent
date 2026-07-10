@@ -3,12 +3,14 @@ class Profile {
   final String fullName;
   final String? phone;
   final String role;
+  final String? avatarUrl; // baru
 
   Profile({
     required this.id,
     required this.fullName,
     this.phone,
     required this.role,
+    this.avatarUrl,
   });
 
   factory Profile.fromJson(Map<String, dynamic> json) {
@@ -17,6 +19,7 @@ class Profile {
       fullName: json['full_name'],
       phone: json['phone'],
       role: json['role'],
+      avatarUrl: json['avatar_url'],
     );
   }
 

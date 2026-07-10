@@ -1,5 +1,9 @@
+import 'package:bikinevent/models/explore_filter.dart';
 import 'package:bikinevent/pages/calendar_page.dart';
+import 'package:bikinevent/pages/explore_page.dart';
+import 'package:bikinevent/pages/location_page.dart';
 import 'package:bikinevent/pages/my_tickets.dart';
+import 'package:bikinevent/services/favorite_service.dart';
 import 'package:bikinevent/services/location_service.dart';
 import 'package:bikinevent/widgets/state_widget.dart';
 import 'package:flutter/material.dart';
@@ -33,7 +37,7 @@ class _HomePageState extends State<HomePage> {
           _EventListView(),
           CalendarPage(),
           MyTicketsPage(),
-          _LocationPlaceholder(), // Step 22 nanti diisi lengkap
+          LocationPage(), // Step 22 nanti diisi lengkap
           ProfilePage(),
         ],
       ),
@@ -95,10 +99,12 @@ class _EventListViewState extends State<_EventListView> {
   final _authService = AuthService();
   final _searchController = TextEditingController();
   final _locationService = LocationService();
+  final _favoriteService = FavoriteService();
 
+  Set<String> _favoriteIds = {};
   String? _locationLabel;
   List<CategoryModel> _categories = [];
-  List<EventModel> _events = [];
+  List<EventModel> _allEvents = [];
   Profile? _profile;
   String? _selectedCategoryId;
   bool _isLoading = true;
@@ -108,6 +114,7 @@ class _EventListViewState extends State<_EventListView> {
   void initState() {
     super.initState();
     _loadData();
+    _loadFavorites();
     _loadLocation();
   }
 
@@ -135,13 +142,11 @@ class _EventListViewState extends State<_EventListView> {
     try {
       final profile = await _authService.getProfile();
       final categories = await _eventService.getCategories();
-      final events = await _eventService.getEvents(
-        categoryId: _selectedCategoryId,
-      );
+      final events = await _eventService.getEvents();
       setState(() {
         _profile = profile;
         _categories = categories;
-        _events = events;
+        _allEvents = events;
       });
     } catch (e) {
       setState(() => _errorMessage = e.toString());
@@ -155,12 +160,55 @@ class _EventListViewState extends State<_EventListView> {
     _loadData();
   }
 
-  List<EventModel> get _filteredBySearch {
+  Future<void> _loadFavorites() async {
+    final favorites = await _favoriteService.getFavoriteEvents();
+    if (mounted)
+      setState(() => _favoriteIds = favorites.map((e) => e.id).toSet());
+  }
+
+  Future<void> _toggleFavorite(EventModel event) async {
+    final isFav = _favoriteIds.contains(event.id);
+    setState(() {
+      if (isFav) {
+        _favoriteIds.remove(event.id);
+      } else {
+        _favoriteIds.add(event.id);
+      }
+    });
+    try {
+      await _favoriteService.toggleFavorite(event.id, isFav);
+    } catch (_) {
+      // rollback kalau gagal
+      setState(() {
+        if (isFav) {
+          _favoriteIds.add(event.id);
+        } else {
+          _favoriteIds.remove(event.id);
+        }
+      });
+    }
+  }
+
+  // Popular TIDAK terpengaruh kategori yang dipilih -- selalu dari _allEvents utuh
+  List<EventModel> get _popularEvents {
+    final sorted = [..._allEvents]
+      ..sort((a, b) => b.totalSold.compareTo(a.totalSold));
+    return sorted.take(5).toList();
+  }
+
+  // List Explore bawah TERPENGARUH kategori + pencarian
+  List<EventModel> get _exploreList {
+    var list = [..._allEvents];
+    if (_selectedCategoryId != null) {
+      list = list.where((e) => e.categoryId == _selectedCategoryId).toList();
+    }
     final keyword = _searchController.text.trim().toLowerCase();
-    if (keyword.isEmpty) return _events;
-    return _events
-        .where((e) => e.title.toLowerCase().contains(keyword))
-        .toList();
+    if (keyword.isNotEmpty) {
+      list = list
+          .where((e) => e.title.toLowerCase().contains(keyword))
+          .toList();
+    }
+    return list;
   }
 
   @override
@@ -275,8 +323,16 @@ class _EventListViewState extends State<_EventListView> {
             const SizedBox(height: 20),
             PillSearchBar(
               controller: _searchController,
-              onChanged: (_) => setState(() {}),
               dark: true,
+              onSubmitted: (value) {
+                if (value.trim().isEmpty) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ExplorePage(initialQuery: value.trim()),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -285,11 +341,7 @@ class _EventListViewState extends State<_EventListView> {
   }
 
   Widget _buildPopularEvents() {
-    // "Popular" didefinisikan sederhana: event dengan tiket terjual terbanyak
-    final popular = [..._events]
-      ..sort((a, b) => b.totalSold.compareTo(a.totalSold));
-    final topEvents = popular.take(5).toList();
-
+    final topEvents = _popularEvents;
     if (topEvents.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -307,12 +359,24 @@ class _EventListViewState extends State<_EventListView> {
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 20),
-                child: Text(
-                  'VIEW ALL',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                child: GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ExplorePage(
+                        initialFilter: ExploreFilter(
+                          sortBy: SortOption.popular,
+                        ),
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    'VIEW ALL',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -320,17 +384,25 @@ class _EventListViewState extends State<_EventListView> {
           ),
           const SizedBox(height: 14),
           SizedBox(
-            height: 256,
+            height: 315,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: topEvents.length,
               itemBuilder: (context, index) {
                 final event = topEvents[index];
-                return EventCardLarge(
-                  event: event,
-                  lowestPrice: event.lowestPrice,
-                  soldCount: event.totalSold,
-                  onTap: () => _openDetail(event),
+                return Padding(
+                  padding: const EdgeInsets.only(right: 14),
+                  child: SizedBox(
+                    width: 260,
+                    child: EventCardLarge(
+                      event: event,
+                      lowestPrice: event.lowestPrice,
+                      soldCount: event.totalSold,
+                      isFavorite: _favoriteIds.contains(event.id),
+                      onFavoriteTap: () => _toggleFavorite(event),
+                      onTap: () => _openDetail(event),
+                    ),
+                  ),
                 );
               },
             ),
@@ -346,9 +418,32 @@ class _EventListViewState extends State<_EventListView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Choose By Category ✨',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Explore',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 20),
+                child: GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ExplorePage()),
+                  ),
+                  child: Text(
+                    'VIEW ALL',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -409,7 +504,7 @@ class _EventListViewState extends State<_EventListView> {
   }
 
   Widget _buildFilteredList() {
-    final list = _filteredBySearch;
+    final list = _exploreList;
 
     if (list.isEmpty) {
       return const SliverToBoxAdapter(

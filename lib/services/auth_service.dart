@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:bikinevent/models/profile_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -67,5 +69,19 @@ class AuthService {
         .from('profiles')
         .update({'full_name': fullName, 'phone': phone})
         .eq('id', userId);
+  }
+
+  Future<String> uploadAvatar(File imageFile) async {
+    final userId = _client.auth.currentUser!.id;
+    final fileExt = imageFile.path.split('.').last;
+    final path = '$userId/avatar.$fileExt';
+
+    await _client.storage
+        .from('avatars')
+        .upload(path, imageFile, fileOptions: const FileOptions(upsert: true));
+    final url = _client.storage.from('avatars').getPublicUrl(path);
+
+    await _client.from('profiles').update({'avatar_url': url}).eq('id', userId);
+    return url;
   }
 }

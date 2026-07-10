@@ -11,6 +11,7 @@ class EventCardLarge extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onFavoriteTap;
   final bool isFavorite;
+  final double posterHeight; // baru: default lebih tinggi untuk Home
 
   const EventCardLarge({
     super.key,
@@ -20,6 +21,8 @@ class EventCardLarge extends StatelessWidget {
     required this.onTap,
     this.onFavoriteTap,
     this.isFavorite = false,
+    this.posterHeight =
+        190, // Home pakai default ini (lebih tinggi dari sebelumnya 150)
   });
 
   @override
@@ -29,8 +32,7 @@ class EventCardLarge extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 260,
-        margin: const EdgeInsets.only(right: 14),
+        width: double.infinity,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -45,42 +47,45 @@ class EventCardLarge extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
+            // Poster sekarang punya padding di 3 sisi (bukan mepet ke tepi card),
+            // dan sudutnya sendiri dibulatkan -- sesuai referensi
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: event.posterUrl != null
+                        ? Image.network(
+                            event.posterUrl!,
+                            height: posterHeight,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _posterPlaceholder(),
+                          )
+                        : _posterPlaceholder(),
                   ),
-                  child: event.posterUrl != null
-                      ? Image.network(
-                          event.posterUrl!,
-                          height: 150,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _posterPlaceholder(),
-                        )
-                      : _posterPlaceholder(),
-                ),
-                Positioned(
-                  top: 10,
-                  right: 10,
-                  child: GestureDetector(
-                    onTap: onFavoriteTap,
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.35),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: isFavorite ? AppColors.error : Colors.white,
-                        size: 18,
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: GestureDetector(
+                      onTap: onFavoriteTap,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: isFavorite ? AppColors.error : Colors.white,
+                          size: 18,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -91,12 +96,12 @@ class EventCardLarge extends StatelessWidget {
                     event.title,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: 15,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       const Icon(
@@ -126,11 +131,13 @@ class EventCardLarge extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(child: AvatarStack(count: soldCount)),
+                      Flexible(
+                        child: AvatarStack(count: soldCount),
+                      ), // dibungkus Flexible
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -162,7 +169,7 @@ class EventCardLarge extends StatelessWidget {
 
   Widget _posterPlaceholder() {
     return Container(
-      height: 150,
+      height: posterHeight,
       color: AppColors.grey,
       child: const Center(
         child: Icon(Icons.event, size: 36, color: AppColors.primary),

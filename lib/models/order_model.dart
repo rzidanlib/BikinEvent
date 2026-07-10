@@ -4,6 +4,7 @@ class OrderItemModel {
   final String ticketId;
   final String qrCode;
   final bool isCheckedIn;
+  final String eventId;
   final DateTime? checkedInAt;
 
   OrderItemModel({
@@ -12,16 +13,18 @@ class OrderItemModel {
     required this.ticketId,
     required this.qrCode,
     required this.isCheckedIn,
+    required this.eventId,
     this.checkedInAt,
   });
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     return OrderItemModel(
-      id: json['id'],
-      orderId: json['order_id'],
-      ticketId: json['ticket_id'],
-      qrCode: json['qr_code'],
-      isCheckedIn: json['is_checked_in'],
+      id: json['id'] as String? ?? '',
+      eventId: json['event_id'] as String? ?? '',
+      orderId: json['order_id'] as String? ?? '',
+      ticketId: json['ticket_id'] as String? ?? '',
+      qrCode: json['qr_code'] as String? ?? '',
+      isCheckedIn: json['is_checked_in'] as bool? ?? false,
       checkedInAt: json['checked_in_at'] != null
           ? DateTime.parse(json['checked_in_at'])
           : null,

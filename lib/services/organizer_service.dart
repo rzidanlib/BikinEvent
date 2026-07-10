@@ -58,13 +58,13 @@ class OrganizerService {
   // Ambil semua event milik organizer yang sedang login
   Future<List<EventModel>> getMyEvents() async {
     final userId = _client.auth.currentUser!.id;
-
     final response = await _client
         .from('events')
-        .select('*, categories(name), tickets(price, sold, quota)')
+        .select(
+          '*, categories(name), tickets(price, sold, quota)',
+        ) // ini aman, tidak ada profiles
         .eq('organizer_id', userId)
         .order('event_date', ascending: false);
-
     return (response as List).map((json) => EventModel.fromJson(json)).toList();
   }
 

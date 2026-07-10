@@ -1,4 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+
 import '../models/event_model.dart';
 
 class EventService {
@@ -18,7 +20,7 @@ class EventService {
     var query = _client
         .from('events')
         .select(
-          '*, profiles(full_name), categories(name), tickets(price, sold)',
+          '*, profiles!events_organizer_id_fkey(full_name), categories(name), tickets(price, sold, quota)',
         );
 
     if (categoryId != null) {
@@ -34,10 +36,11 @@ class EventService {
   Future<EventModel> getEventDetail(String eventId) async {
     final response = await _client
         .from('events')
-        .select('*, profiles(full_name), categories(name)')
+        .select(
+          '*, profiles!events_organizer_id_fkey(full_name), categories(name)',
+        )
         .eq('id', eventId)
         .single();
-
     return EventModel.fromJson(response);
   }
 
@@ -52,4 +55,22 @@ class EventService {
         .map((json) => TicketModel.fromJson(json))
         .toList();
   }
+}
+
+// Ambil event yang punya koordinat & berjarak <= radiusKm dari posisi user
+List<EventModel> filterNearbyEvents(
+  List<EventModel> events,
+  Position userPos,
+  double radiusKm,
+) {
+  return events.where((e) {
+    if (e.latitude == null || e.longitude == null) return false;
+    final distanceMeters = Geolocator.distanceBetween(
+      userPos.latitude,
+      userPos.longitude,
+      e.latitude!,
+      e.longitude!,
+    );
+    return distanceMeters <= radiusKm * 1000;
+  }).toList();
 }

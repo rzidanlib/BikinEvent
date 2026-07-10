@@ -3,7 +3,6 @@ import 'package:bikinevent/widgets/state_widget.dart';
 import 'package:flutter/material.dart';
 import '../../services/organizer_service.dart';
 import '../../models/event_model.dart';
-import '../../theme/app_colors.dart';
 import '../../widgets/organizer_event_card.dart';
 import 'create_event_page.dart';
 

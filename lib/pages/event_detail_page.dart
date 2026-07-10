@@ -1,3 +1,4 @@
+import 'package:bikinevent/services/favorite_service.dart';
 import 'package:bikinevent/widgets/state_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -5,7 +6,6 @@ import '../services/event_service.dart';
 import '../services/auth_service.dart';
 import '../models/event_model.dart';
 import '../theme/app_colors.dart';
-import '../widgets/avatar_stack.dart';
 import 'checkout_page.dart';
 
 class EventDetailPage extends StatefulWidget {
@@ -20,11 +20,12 @@ class _EventDetailPageState extends State<EventDetailPage> {
   final _eventService = EventService();
   final _authService = AuthService();
   final _scrollController = ScrollController();
+  final _favoriteService = FavoriteService();
 
+  bool _isFavorite = false;
   EventModel? _event;
   List<TicketModel> _tickets = [];
   String? _userRole;
-  bool _isFavorite = false; // sementara UI-only, belum tersimpan ke database
   bool _isLoading = true;
   String? _errorMessage;
   bool _descExpanded = false;
@@ -50,10 +51,12 @@ class _EventDetailPageState extends State<EventDetailPage> {
       final event = await _eventService.getEventDetail(widget.eventId);
       final tickets = await _eventService.getTicketsByEvent(widget.eventId);
       final profile = await _authService.getProfile();
+      final favorited = await _favoriteService.isFavorited(widget.eventId);
       setState(() {
         _event = event;
         _tickets = tickets;
         _userRole = profile?.role;
+        _isFavorite = favorited;
       });
     } catch (e) {
       setState(() => _errorMessage = e.toString());
@@ -101,62 +104,85 @@ class _EventDetailPageState extends State<EventDetailPage> {
               SliverToBoxAdapter(child: _buildHeroImage(event, currencyFormat)),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    20,
-                    20,
-                    20,
-                    120,
-                  ), // ruang untuk bottom bar
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        event.title,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                      // Kartu info utama -- title, lokasi, tanggal
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.grey,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    event.title,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (_tickets.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Text(
+                                      'Mulai ${currencyFormat.format(_lowestPrice)}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 15,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    event.location,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.calendar_today,
+                                  size: 15,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    dateFormat.format(event.eventDate),
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on,
-                            size: 15,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              event.location,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.calendar_today,
-                            size: 15,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              dateFormat.format(event.eventDate),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      AvatarStack(
-                        count: event.totalSold,
-                        label: 'Members are joined',
-                      ),
-                      const Divider(height: 32),
+                      const SizedBox(height: 20),
 
                       // Kartu organizer
                       Row(
@@ -302,7 +328,18 @@ class _EventDetailPageState extends State<EventDetailPage> {
                     ),
                     _circleIconButton(
                       _isFavorite ? Icons.favorite : Icons.favorite_border,
-                      () => setState(() => _isFavorite = !_isFavorite),
+                      () async {
+                        final newState = !_isFavorite;
+                        setState(() => _isFavorite = newState);
+                        try {
+                          await _favoriteService.toggleFavorite(
+                            widget.eventId,
+                            !newState,
+                          );
+                        } catch (_) {
+                          setState(() => _isFavorite = !newState);
+                        }
+                      },
                       iconColor: _isFavorite ? AppColors.error : Colors.white,
                     ),
                   ],
@@ -428,7 +465,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
                         ? 'TIKET HABIS'
                         : (_tickets.isEmpty
                               ? 'BELUM ADA TIKET'
-                              : 'BUY A TICKET • ${currencyFormat.format(_lowestPrice)}'),
+                              : 'BUY A TICKET'),
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
