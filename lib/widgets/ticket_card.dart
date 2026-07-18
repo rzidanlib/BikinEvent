@@ -154,7 +154,7 @@ class TicketCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final qrSize = constraints.maxWidth.clamp(0.0, 238.0);
+                final qrSize = constraints.maxWidth * 0.65;
                 return Center(
                   child: SizedBox(
                     width: qrSize,
