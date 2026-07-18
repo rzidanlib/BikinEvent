@@ -1,4 +1,5 @@
 import 'package:bikinevent/pages/payment_page.dart';
+import 'package:bikinevent/services/event_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/event_model.dart';
@@ -23,23 +24,53 @@ class CheckoutPage extends StatefulWidget {
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
+  final _eventService = EventService();
   late TicketModel _selectedTicket;
   int _quantity = 1;
+
+  Map<String, bool> _eligibilityMap = {}; // ticketId -> eligible atau tidak
+  bool _isCheckingEligibility = true;
 
   @override
   void initState() {
     super.initState();
-    // Default pilih tiket pertama yang masih tersedia
     _selectedTicket = widget.tickets.firstWhere(
       (t) => !t.isSoldOut,
       orElse: () => widget.tickets.first,
     );
+    _checkEligibility();
+  }
+
+  Future<void> _checkEligibility() async {
+    final map = <String, bool>{};
+    for (final ticket in widget.tickets) {
+      if (ticket.restrictionType == TicketRestriction.none) {
+        map[ticket.id] = true;
+      } else {
+        map[ticket.id] = await _eventService.isTicketEligible(ticket.id);
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _eligibilityMap = map;
+        _isCheckingEligibility = false;
+        // Pastikan tiket yang otomatis terpilih di awal memang eligible
+        if (_eligibilityMap[_selectedTicket.id] != true) {
+          final firstEligible = widget.tickets
+              .where((t) => !t.isSoldOut && _eligibilityMap[t.id] == true)
+              .toList();
+          if (firstEligible.isNotEmpty) _selectedTicket = firstEligible.first;
+        }
+      });
+    }
   }
 
   void _selectTicket(TicketModel ticket) {
+    if (_eligibilityMap[ticket.id] != true)
+      return; // cegah pilih tiket yang tidak eligible
     setState(() {
       _selectedTicket = ticket;
-      _quantity = 1; // reset jumlah tiap ganti jenis tiket
+      _quantity = 1;
     });
   }
 
@@ -70,7 +101,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
             Row(
               children: widget.tickets.map((ticket) {
                 final isSelected = ticket.id == _selectedTicket.id;
-                final isDisabled = ticket.isSoldOut;
+                final isEligible = _eligibilityMap[ticket.id] ?? false;
+                final isDisabled = ticket.isSoldOut || !isEligible;
 
                 return Expanded(
                   child: Padding(
@@ -103,11 +135,23 @@ class _CheckoutPageState extends State<CheckoutPage> {
                                           : AppColors.primary),
                               ),
                             ),
-                            if (isDisabled)
+                            if (ticket.isSoldOut)
                               const Text(
                                 'Habis',
                                 style: TextStyle(
                                   fontSize: 10,
+                                  color: AppColors.softDarkish,
+                                ),
+                              )
+                            else if (!isEligible)
+                              Text(
+                                ticket.restrictionType ==
+                                        TicketRestriction.institutionOnly
+                                    ? 'Khusus ${ticket.restrictionInstitutionName ?? "Institusi"}'
+                                    : 'Khusus Pelajar/Mhs',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 9,
                                   color: AppColors.softDarkish,
                                 ),
                               ),
@@ -119,6 +163,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 );
               }).toList(),
             ),
+
+            if (_isCheckingEligibility)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+
             const SizedBox(height: 28),
 
             const Text(

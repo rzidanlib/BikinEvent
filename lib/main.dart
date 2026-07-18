@@ -1,8 +1,10 @@
+import 'package:bikinevent/pages/admin/admin_shell.dart';
 import 'package:bikinevent/pages/organizer/organizer_shell.dart';
 import 'package:bikinevent/pages/splash_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/home_page.dart';
@@ -10,11 +12,13 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load(fileName: '.env');
   await initializeDateFormatting('id_ID', null);
   // Inisialisasi koneksi ke Supabase
   await Supabase.initialize(
-    url: 'https://lansqkdazqluzsvqsiup.supabase.co',
-    publishableKey: 'sb_publishable_96fg09Mf1BNlciQGZFO3yw_P4EMtiJZ',
+    url: dotenv.env['SUPABASE_URL']!,
+    publishableKey: dotenv.env['SUPABASE_PUBLISHABLE_KEY']!,
   );
 
   runApp(const MyApp());
@@ -101,6 +105,9 @@ class RoleBasedRouter extends StatelessWidget {
         final role = snapshot.data;
         if (role == 'organizer') {
           return const OrganizerShell();
+        }
+        if (role == 'admin') {
+          return const AdminShell();
         }
         return const HomePage();
       },

@@ -1,5 +1,40 @@
 import 'package:flutter/material.dart';
 
+enum TicketRestriction { none, institutionOnly, studentOnly }
+
+TicketRestriction ticketRestrictionFromString(String? value) {
+  switch (value) {
+    case 'institution_only':
+      return TicketRestriction.institutionOnly;
+    case 'student_only':
+      return TicketRestriction.studentOnly;
+    default:
+      return TicketRestriction.none;
+  }
+}
+
+String ticketRestrictionToString(TicketRestriction r) {
+  switch (r) {
+    case TicketRestriction.institutionOnly:
+      return 'institution_only';
+    case TicketRestriction.studentOnly:
+      return 'student_only';
+    case TicketRestriction.none:
+      return 'none';
+  }
+}
+
+String ticketRestrictionLabel(TicketRestriction r) {
+  switch (r) {
+    case TicketRestriction.none:
+      return 'Tidak dibatasi';
+    case TicketRestriction.institutionOnly:
+      return 'Khusus Institusi Tertentu';
+    case TicketRestriction.studentOnly:
+      return 'Khusus Pelajar & Mahasiswa';
+  }
+}
+
 class CategoryModel {
   final String id;
   final String name;
@@ -23,6 +58,9 @@ class TicketModel {
   final double price;
   final int quota;
   final int sold;
+  final TicketRestriction restrictionType;
+  final String? restrictionInstitutionId;
+  final String? restrictionInstitutionName; // hasil join, opsional
 
   TicketModel({
     required this.id,
@@ -31,6 +69,9 @@ class TicketModel {
     required this.price,
     required this.quota,
     required this.sold,
+    this.restrictionType = TicketRestriction.none,
+    this.restrictionInstitutionId,
+    this.restrictionInstitutionName,
   });
 
   int get remaining => quota - sold;
@@ -41,9 +82,14 @@ class TicketModel {
       id: json['id'],
       eventId: json['event_id'],
       name: json['name'],
-      price: (json['price'] as num).toDouble(),
-      quota: json['quota'],
-      sold: json['sold'],
+      price: (json['price'] as num?)?.toDouble() ?? 0,
+      quota: (json['quota'] as int?) ?? 0,
+      sold: (json['sold'] as int?) ?? 0,
+      restrictionType: ticketRestrictionFromString(json['restriction_type']),
+      restrictionInstitutionId: json['restriction_institution_id'],
+      restrictionInstitutionName: json['institutions'] != null
+          ? json['institutions']['name']
+          : null,
     );
   }
 }

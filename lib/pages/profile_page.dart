@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:bikinevent/models/institution_model.dart';
+import 'package:bikinevent/pages/my_event_detail.page.dart';
 import 'package:bikinevent/widgets/state_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,8 +13,6 @@ import '../models/order_model.dart';
 import '../models/event_model.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_text_field.dart';
-import '../widgets/ticket_list_card.dart';
-import '../widgets/ticket_detail_modal.dart';
 import '../widgets/event_card_compact.dart';
 import 'auth/login_page.dart';
 import 'event_detail_page.dart';
@@ -381,6 +381,55 @@ class _ProfileInfoTabState extends State<_ProfileInfoTab> {
                 Icons.mail_outline,
               ),
 
+              const SizedBox(height: 16),
+
+              if (profile?.statusType == 'pelajar_mahasiswa') ...[
+                const Text(
+                  'Status Pendidikan',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                _readOnlyField(
+                  profile?.educationLevel != null
+                      ? institutionLevelLabel(
+                          institutionLevelFromString(profile!.educationLevel!),
+                        )
+                      : '-',
+                  Icons.school_outlined,
+                ),
+                const SizedBox(height: 16),
+
+                const Text(
+                  'Institusi',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                _readOnlyField(
+                  profile?.institutionName ?? '-',
+                  Icons.account_balance_outlined,
+                ),
+                const SizedBox(height: 16),
+
+                const Text(
+                  'Nomor Induk (NISN/NIM)',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                _readOnlyField(
+                  profile?.studentNumber ?? '-',
+                  Icons.badge_outlined,
+                ),
+                const SizedBox(height: 16),
+              ] else ...[
+                const Text(
+                  'Status',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                _readOnlyField('Umum', Icons.public),
+                const SizedBox(height: 16),
+              ],
+
               if (_isEditing) ...[
                 const SizedBox(height: 20),
                 ElevatedButton(
@@ -521,9 +570,10 @@ class _MyEventsTabState extends State<_MyEventsTab> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => EventDetailPage(eventId: item.eventId),
+                  builder: (_) => MyEventDetailPage(eventId: item.eventId),
                 ),
               ),
+
               child: Row(
                 children: [
                   Container(

@@ -109,6 +109,7 @@ class _EventListViewState extends State<_EventListView> {
   String? _selectedCategoryId;
   bool _isLoading = true;
   String? _errorMessage;
+  List<EventModel> _campusEvents = [];
 
   @override
   void initState() {
@@ -143,10 +144,14 @@ class _EventListViewState extends State<_EventListView> {
       final profile = await _authService.getProfile();
       final categories = await _eventService.getCategories();
       final events = await _eventService.getEvents();
+      final campusEvents = profile?.statusType == 'pelajar_mahasiswa'
+          ? await _eventService.getCampusEvents()
+          : <EventModel>[];
       setState(() {
         _profile = profile;
         _categories = categories;
         _allEvents = events;
+        _campusEvents = campusEvents;
       });
     } catch (e) {
       setState(() => _errorMessage = e.toString());
@@ -227,6 +232,7 @@ class _EventListViewState extends State<_EventListView> {
                 child: ErrorView(message: _errorMessage!, onRetry: _loadData),
               )
             else ...[
+              SliverToBoxAdapter(child: _buildCampusEvents()),
               SliverToBoxAdapter(child: _buildPopularEvents()),
               SliverToBoxAdapter(child: _buildCategorySection()),
               SliverPadding(
@@ -461,6 +467,65 @@ class _EventListViewState extends State<_EventListView> {
                 ),
                 const SizedBox(width: 20),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCampusEvents() {
+    if (_campusEvents.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 0, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.school,
+                  color: AppColors.primary,
+                  size: 16,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Event Khusus Kamu',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 320,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _campusEvents.length,
+              itemBuilder: (context, index) {
+                final event = _campusEvents[index];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 14, left: 0),
+                  child: SizedBox(
+                    width: 260,
+                    child: EventCardLarge(
+                      event: event,
+                      lowestPrice: event.lowestPrice,
+                      soldCount: event.totalSold,
+                      isFavorite: _favoriteIds.contains(event.id),
+                      onFavoriteTap: () => _toggleFavorite(event),
+                      onTap: () => _openDetail(event),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],

@@ -1,3 +1,4 @@
+import 'package:bikinevent/models/institution_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -47,13 +48,62 @@ class EventService {
   Future<List<TicketModel>> getTicketsByEvent(String eventId) async {
     final response = await _client
         .from('tickets')
-        .select()
+        .select('*, institutions(name)')
         .eq('event_id', eventId)
         .order('price', ascending: true);
 
     return (response as List)
         .map((json) => TicketModel.fromJson(json))
         .toList();
+  }
+
+  Future<List<InstitutionModel>> getInstitutionsByLevel(
+    InstitutionLevel level,
+  ) async {
+    final response = await _client
+        .from('institutions')
+        .select()
+        .eq('level', level.name)
+        .order('name');
+    return (response as List)
+        .map((json) => InstitutionModel.fromJson(json))
+        .toList();
+  }
+
+  Future<List<InstitutionModel>> getAllInstitutions() async {
+    final response = await _client.from('institutions').select().order('name');
+    return (response as List)
+        .map((json) => InstitutionModel.fromJson(json))
+        .toList();
+  }
+
+  Future<bool> isTicketEligible(String ticketId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return false;
+
+    final response = await _client.rpc(
+      'is_ticket_eligible',
+      params: {'p_ticket_id': ticketId, 'p_user_id': userId},
+    );
+
+    return response as bool;
+  }
+
+  Future<List<EventModel>> getCampusEvents() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    final response = await _client.rpc('get_campus_events');
+
+    // RPC mengembalikan list row events polos (tanpa join profiles/categories/tickets),
+    // jadi kita re-fetch detail lengkapnya lewat getEvents() dan filter berdasarkan id hasil RPC
+    final campusEventIds = (response as List)
+        .map((e) => e['id'] as String)
+        .toSet();
+    if (campusEventIds.isEmpty) return [];
+
+    final allEvents = await getEvents();
+    return allEvents.where((e) => campusEventIds.contains(e.id)).toList();
   }
 }
 

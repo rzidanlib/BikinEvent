@@ -11,11 +11,22 @@ class AuthService {
     required String password,
     required String fullName,
     required String role,
+    required String statusType, // 'umum' atau 'pelajar_mahasiswa'
+    String? educationLevel, // 'smp' / 'sma' / 'mahasiswa', null kalau umum
+    String? institutionId,
+    String? studentNumber,
   }) async {
     return await _client.auth.signUp(
       email: email,
       password: password,
-      data: {'full name': fullName, 'role': role},
+      data: {
+        'full_name': fullName,
+        'role': role,
+        'status_type': statusType,
+        'education_level': educationLevel,
+        'institution_id': institutionId,
+        'student_number': studentNumber,
+      },
     );
   }
 
@@ -55,7 +66,7 @@ class AuthService {
 
     final response = await _client
         .from('profiles')
-        .select()
+        .select('*, institutions(name)')
         .eq('id', userId)
         .single();
 

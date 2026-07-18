@@ -62,4 +62,27 @@ class CheckoutService {
 
     return List<Map<String, dynamic>>.from(response);
   }
+
+  Future<List<Map<String, dynamic>>> getMyTicketsForEvent(
+    String eventId,
+  ) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    final response = await _client
+        .from('order_items')
+        .select('''
+        id, qr_code, is_checked_in, checked_in_at, created_at,
+        tickets!inner (
+          name, price, event_id,
+          events!inner ( id, title, location, event_date, poster_url )
+        ),
+        orders!inner ( buyer_id )
+      ''')
+        .eq('orders.buyer_id', userId)
+        .eq('tickets.event_id', eventId)
+        .order('created_at', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response);
+  }
 }

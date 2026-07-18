@@ -75,6 +75,8 @@ class OrganizerService {
     required String ticketTypeName,
     required double price,
     required int quota,
+    required TicketRestriction restrictionType,
+    String? restrictionInstitutionId,
   }) async {
     await _client.from('tickets').insert({
       'event_id': eventId,
@@ -82,6 +84,11 @@ class OrganizerService {
       'name': ticketTypeName,
       'price': price,
       'quota': quota,
+      'restriction_type': ticketRestrictionToString(restrictionType),
+      'restriction_institution_id':
+          restrictionType == TicketRestriction.institutionOnly
+          ? restrictionInstitutionId
+          : null,
     });
   }
 

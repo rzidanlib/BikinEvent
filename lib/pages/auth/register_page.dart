@@ -1,3 +1,5 @@
+import 'package:bikinevent/models/institution_model.dart';
+import 'package:bikinevent/services/event_service.dart';
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_colors.dart';
@@ -20,9 +22,38 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _eventService = EventService();
+  final _studentNumberController = TextEditingController();
 
+  String _statusType = 'umum'; // 'umum' atau 'pelajar_mahasiswa'
+  InstitutionLevel? _selectedEducationLevel;
+  List<InstitutionModel> _institutions = [];
+  String? _selectedInstitutionId;
+  bool _isLoadingInstitutions = false;
   String _selectedRole = 'user';
   bool _isLoading = false;
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _onEducationLevelChanged(InstitutionLevel? level) async {
+    setState(() {
+      _selectedEducationLevel = level;
+      _selectedInstitutionId = null;
+      _institutions = [];
+    });
+    if (level == null) return;
+
+    setState(() => _isLoadingInstitutions = true);
+    try {
+      final list = await _eventService.getInstitutionsByLevel(level);
+      setState(() => _institutions = list);
+    } finally {
+      if (mounted) setState(() => _isLoadingInstitutions = false);
+    }
+  }
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
@@ -34,6 +65,27 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
+    if (_statusType == 'pelajar_mahasiswa') {
+      if (_selectedEducationLevel == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pilih jenjang pendidikan')),
+        );
+        return;
+      }
+      if (_selectedInstitutionId == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Pilih institusi')));
+        return;
+      }
+      if (_studentNumberController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nomor induk wajib diisi')),
+        );
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     try {
       await _authService.signUp(
@@ -41,6 +93,16 @@ class _RegisterPageState extends State<RegisterPage> {
         password: _passwordController.text.trim(),
         fullName: _nameController.text.trim(),
         role: _selectedRole,
+        statusType: _statusType,
+        educationLevel: _statusType == 'pelajar_mahasiswa'
+            ? _selectedEducationLevel!.name
+            : null,
+        institutionId: _statusType == 'pelajar_mahasiswa'
+            ? _selectedInstitutionId
+            : null,
+        studentNumber: _statusType == 'pelajar_mahasiswa'
+            ? _studentNumberController.text.trim()
+            : null,
       );
 
       if (mounted) {
@@ -57,11 +119,10 @@ class _RegisterPageState extends State<RegisterPage> {
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal daftar: ${e.toString()}')),
         );
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -132,7 +193,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   validator: (v) =>
                       (v == null || v.isEmpty) ? 'Wajib diisi' : null,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 // Pemilihan role — didesain sebagai segmented toggle
                 // supaya tetap ringkas & konsisten dengan gaya visual referensi
@@ -164,7 +225,82 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+
+                Text(
+                  'Status',
+                  style: TextStyle(
+                    color: AppColors.softDarkish,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _statusOption('umum', 'Umum', Icons.public),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _statusOption(
+                        'pelajar_mahasiswa',
+                        'Pelajar/Mahasiswa',
+                        Icons.school,
+                      ),
+                    ),
+                  ],
+                ),
+
+                if (_statusType == 'pelajar_mahasiswa') ...[
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<InstitutionLevel>(
+                    initialValue: _selectedEducationLevel,
+                    decoration: const InputDecoration(
+                      labelText: 'Jenjang Pendidikan',
+                    ),
+                    items: InstitutionLevel.values
+                        .map(
+                          (l) => DropdownMenuItem(
+                            value: l,
+                            child: Text(institutionLevelLabel(l)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _onEducationLevelChanged,
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedInstitutionId,
+                    decoration: InputDecoration(
+                      labelText: 'Institusi',
+                      suffixIcon: _isLoadingInstitutions
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : null,
+                    ),
+                    items: _institutions
+                        .map(
+                          (i) => DropdownMenuItem(
+                            value: i.id,
+                            child: Text(i.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _selectedEducationLevel == null
+                        ? null
+                        : (v) => setState(() => _selectedInstitutionId = v),
+                  ),
+                  const SizedBox(height: 14),
+                  AppTextField(
+                    controller: _studentNumberController,
+                    hintText: 'Nomor Induk (NISN/NIM)',
+                    prefixIcon: Icons.badge_outlined,
+                  ),
+                ],
+                const SizedBox(height: 20),
 
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleRegister,
@@ -206,6 +342,51 @@ class _RegisterPageState extends State<RegisterPage> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statusOption(String value, String label, IconData icon) {
+    final isSelected = _statusType == value;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _statusType = value;
+        if (value == 'umum') {
+          _selectedEducationLevel = null;
+          _selectedInstitutionId = null;
+          _institutions = [];
+        }
+      }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : AppColors.grey,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppColors.primary : AppColors.softDarkish,
+              size: 22,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? AppColors.primary : AppColors.softDarkish,
+              ),
+            ),
+          ],
         ),
       ),
     );
